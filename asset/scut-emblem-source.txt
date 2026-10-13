@@ -1,0 +1,7 @@
+资源：华南理工大学标准校徽（彩色 SVG）
+原文件：colored.svg，保留原始矢量内容，未重绘。
+获取地址：https://github.com/Kozmosa/survive-in-scut/blob/main/docs/public/branding/colored.svg
+素材说明页：https://manual.xn--xkrsa0ti6rf4cf98d.com/others/branding.html
+说明页注明源自华南理工大学官网：https://www.scut.edu.cn/new/9017/list.htm
+校徽及相关标识权利归华南理工大学所有。
+本项目为个人开发的辅助扩展，校徽用于标识适用学校，不代表学校官方产品。

@@ -22,7 +22,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["asset/questions.json"],
+      "resources": ["asset/questions.json", "asset/scut-emblem.svg"],
       "matches": [
         "https://zhsys.sb.scut.edu.cn/*"
       ]

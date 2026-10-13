@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "1.0.0";
+  const SCRIPT_VERSION = "1.0.0-floating-ui-1";
   if (globalThis.__safeTestAutoAnswerLoaded === SCRIPT_VERSION) return;
   globalThis.__safeTestAutoAnswerLoaded = SCRIPT_VERSION;
 
@@ -59,34 +59,193 @@
   }
 
   function statusPanel() {
-    let panel = document.getElementById(STATUS_PANEL_ID);
-    if (panel) return panel;
-    panel = document.createElement("div");
-    panel.id = STATUS_PANEL_ID;
-    Object.assign(panel.style, {
-      position: "fixed",
-      zIndex: "2147483647",
-      top: "16px",
-      right: "16px",
-      maxWidth: "420px",
-      padding: "12px 15px",
-      borderRadius: "10px",
-      boxShadow: "0 8px 28px rgba(0,0,0,.22)",
-      color: "#fff",
-      background: "#155eef",
-      font: '14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif',
-      whiteSpace: "pre-wrap",
-      pointerEvents: "none",
+    let root = document.getElementById(STATUS_PANEL_ID);
+    if (root?.dataset.uiVersion === SCRIPT_VERSION && typeof root.reposition === "function") return root;
+    // 扩展重载后，网页中可能仍留着旧面板或旧脚本上下文的 DOM。
+    if (root) root.remove();
+    root = document.createElement("div");
+    root.id = STATUS_PANEL_ID;
+    root.dataset.uiVersion = SCRIPT_VERSION;
+    root.dataset.state = "working";
+    Object.assign(root.style, { position: "fixed", inset: "0", zIndex: "2147483647", pointerEvents: "none" });
+    const style = document.createElement("style");
+    style.textContent = `
+      #safe-test-status { font: 13px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; color: #26354b; text-align: left; }
+      #safe-test-status * { box-sizing: border-box; }
+      #safe-test-status [hidden] { display: none !important; }
+      #safe-test-status button, #safe-test-status a { font-family: inherit; }
+      #safe-test-status button { cursor: pointer; touch-action: manipulation; }
+      #safe-test-status button:focus-visible, #safe-test-status a:focus-visible { outline: 3px solid #80b8ff; outline-offset: 3px; }
+      #safe-test-status .scut-lst-ball { position: fixed; width: 56px; height: 56px; border: 2px solid #d8e8fa; border-radius: 50%; background: #fff; padding: 5px; box-shadow: 0 5px 22px #163d692b; touch-action: none; user-select: none; }
+      #safe-test-status .scut-lst-ball:hover { border-color: #2575b7; box-shadow: 0 6px 24px #163d6940; }
+      #safe-test-status .scut-lst-ball img { width: 100%; height: 100%; display: block; pointer-events: none; }
+      #safe-test-status .scut-lst-badge { position: absolute; top: -4px; right: -4px; min-width: 19px; height: 19px; border: 2px solid #fff; border-radius: 10px; padding: 0 4px; background: #286ca5; color: #fff; font: 600 10px/15px system-ui; }
+      #safe-test-status[data-state="done"] .scut-lst-badge { background: #16805c; }
+      #safe-test-status[data-state="error"] .scut-lst-badge { background: #ba3a3a; }
+      #safe-test-status .scut-lst-card { position: fixed; width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); border: 1px solid #dce5ee; border-radius: 18px; background: #fff; box-shadow: 0 16px 55px #20364a24, 0 2px 8px #20364a12; overflow: hidden; display: flex; flex-direction: column; }
+      #safe-test-status .scut-lst-header { display: flex; align-items: center; gap: 10px; padding: 15px 16px; background: #13375b; color: #fff; cursor: grab; touch-action: none; user-select: none; flex-shrink: 0; }
+      #safe-test-status .scut-lst-header:active { cursor: grabbing; }
+      #safe-test-status .scut-lst-header img { width: 34px; height: 34px; background: #fff; border-radius: 50%; padding: 2px; pointer-events: none; }
+      #safe-test-status .scut-lst-brand { flex: 1; min-width: 0; font-size: 15px; font-weight: 700; letter-spacing: .2px; }
+      #safe-test-status .scut-lst-brand small { display: block; font-size: 11px; font-weight: 400; color: #c5d9ec; letter-spacing: 0; }
+      #safe-test-status .scut-lst-collapse { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid #ffffff38; border-radius: 9px; background: #ffffff12; color: #fff; font-size: 22px; line-height: 1; }
+      #safe-test-status .scut-lst-collapse:hover { background: #ffffff28; }
+      #safe-test-status .scut-lst-body { padding: 16px; overflow: auto; overscroll-behavior: contain; min-height: 0; }
+      #safe-test-status .scut-lst-state { margin-bottom: 11px; color: #2c709f; font-weight: 600; font-size: 12px; }
+      #safe-test-status .scut-lst-state::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 7px; }
+      #safe-test-status[data-state="done"] .scut-lst-state { color: #16805c; }
+      #safe-test-status[data-state="error"] .scut-lst-state { color: #ba3a3a; }
+      #safe-test-status .scut-lst-counts { display: grid; grid-template-columns: repeat(3, 1fr); padding: 12px 0; border: 1px solid #e7edf3; border-radius: 12px; background: #f7f9fc; margin-bottom: 10px; }
+      #safe-test-status .scut-lst-counts div { text-align: center; border-right: 1px solid #e3eaf2; }
+      #safe-test-status .scut-lst-counts div:last-child { border: 0; }
+      #safe-test-status .scut-lst-counts strong { display: block; font-size: 23px; line-height: 1.25; color: #14375b; font-weight: 700; }
+      #safe-test-status .scut-lst-counts span { font-size: 11px; color: #718093; }
+      #safe-test-status .scut-lst-counts div:last-child strong { color: #b77b24; }
+      #safe-test-status .scut-lst-progress { height: 4px; border-radius: 4px; background: #eaf0f6; overflow: hidden; margin-bottom: 12px; }
+      #safe-test-status .scut-lst-progress span { display: block; height: 100%; background: #347aaa; transition: width .2s; }
+      #safe-test-status[data-state="done"] .scut-lst-progress span { background: #16805c; }
+      #safe-test-status .scut-lst-message { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; color: #637286; line-height: 1.7; }
+      #safe-test-status .scut-lst-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+      #safe-test-status .scut-lst-actions:empty { display: none; }
+      #safe-test-status .scut-lst-actions button { min-height: 40px; width: 100%; border: 1px solid #dde6f0; border-radius: 10px; padding: 9px 8px; color: #295b87; background: #f8fafd; font-size: 12px; line-height: 1.45; font-weight: 600; }
+      #safe-test-status .scut-lst-actions button:hover { background: #edf4fb; border-color: #a5c3dd; }
+      #safe-test-status .scut-lst-actions .scut-lst-primary { grid-column: 1 / -1; background: #1d629a; border-color: #1d629a; color: #fff; }
+      #safe-test-status .scut-lst-actions .scut-lst-primary:hover { background: #154f7e; }
+      #safe-test-status .scut-lst-actions .scut-lst-wide { grid-column: 1 / -1; }
+      #safe-test-status .scut-lst-feedback { margin-top: 13px; padding-top: 12px; border-top: 1px solid #edf1f5; color: #7a8797; font-size: 11px; }
+      #safe-test-status .scut-lst-feedback p { margin: 0 0 7px; line-height: 1.7; }
+      #safe-test-status .scut-lst-feedback a { color: #1d629a; text-decoration: none; font-weight: 600; }
+      #safe-test-status .scut-lst-feedback a:hover { text-decoration: underline; }
+      @media (prefers-reduced-motion: reduce) { #safe-test-status .scut-lst-progress span { transition: none; } }
+    `;
+    const ball = document.createElement("button");
+    ball.type = "button";
+    ball.className = "scut-lst-ball";
+    ball.style.pointerEvents = "auto";
+    ball.setAttribute("aria-label", "展开或收起 scut_LST 面板，可拖动");
+    ball.setAttribute("aria-expanded", "true");
+    ball.setAttribute("aria-controls", "scut-lst-card");
+    ball.title = "scut_LST · 点击展开/收起，拖动可移动";
+    const emblem = document.createElement("img");
+    emblem.src = chrome.runtime.getURL("asset/scut-emblem.svg");
+    emblem.alt = "华南理工大学校徽";
+    emblem.draggable = false;
+    const badge = document.createElement("span");
+    badge.className = "scut-lst-badge";
+    badge.textContent = "…";
+    ball.append(emblem, badge);
+    const card = document.createElement("section");
+    card.id = "scut-lst-card";
+    card.className = "scut-lst-card";
+    card.style.pointerEvents = "auto";
+    card.setAttribute("aria-label", "scut_LST 答题状态与下载");
+    card.innerHTML = `<div class="scut-lst-header">
+      <div class="scut-lst-brand">scut_LST<small>实验室安全考试助手 · 拖动标题栏可移动</small></div>
+      <button type="button" class="scut-lst-collapse" aria-label="收起面板" title="收起为悬浮球">−</button>
+      </div><div class="scut-lst-body">
+      <div class="scut-lst-state">正在处理</div>
+      <div class="scut-lst-counts" hidden><div><strong>0</strong><span>总题数</span></div><div><strong>0</strong><span>已作答</span></div><div><strong>0</strong><span>跳过 / 待核对</span></div></div>
+      <div class="scut-lst-progress" role="progressbar" aria-label="作答进度" aria-valuemin="0" aria-valuemax="100" hidden><span></span></div>
+      <div class="scut-lst-message" role="status" aria-live="polite"></div>
+      <div class="scut-lst-actions"></div><div class="scut-lst-feedback" hidden></div></div>`;
+    const header = card.querySelector(".scut-lst-header");
+    header.prepend(emblem.cloneNode(true));
+    const collapse = card.querySelector(".scut-lst-collapse");
+    collapse.style.pointerEvents = "auto";
+    root.append(style, ball, card);
+    document.documentElement.appendChild(root);
+
+    const padding = 12;
+    let ballX = window.innerWidth - 80;
+    let ballY = 96;
+    let cardX = ballX - 376;
+    let cardY = ballY;
+    let suppressBallClick = false;
+    const place = () => {
+      const width = Math.min(360, Math.max(0, window.innerWidth - padding * 2));
+      const height = Math.min(card.offsetHeight || 420, Math.max(0, window.innerHeight - padding * 2));
+      const clamp = (value, maximum) => Math.max(padding, Math.min(value, Math.max(padding, maximum)));
+      ballX = clamp(ballX, window.innerWidth - 56 - padding);
+      ballY = clamp(ballY, window.innerHeight - 56 - padding);
+      cardX = clamp(cardX, window.innerWidth - width - padding);
+      cardY = clamp(cardY, window.innerHeight - height - padding);
+      Object.assign(ball.style, { left: `${ballX}px`, top: `${ballY}px` });
+      Object.assign(card.style, { left: `${cardX}px`, top: `${cardY}px` });
+    };
+    const expanded = (value) => {
+      card.hidden = !value;
+      ball.setAttribute("aria-expanded", String(value));
+      if (value) place();
+    };
+    ball.addEventListener("click", () => {
+      if (suppressBallClick) { suppressBallClick = false; return; }
+      expanded(card.hidden);
     });
-    document.documentElement.appendChild(panel);
-    return panel;
+    collapse.addEventListener("click", () => { expanded(false); ball.focus({ preventScroll: true }); });
+    root.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !card.hidden) {
+        expanded(false);
+        ball.focus({ preventScroll: true });
+      }
+    });
+    const draggable = (handle, isBall) => {
+      let drag = null;
+      handle.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0 || (!isBall && event.target.closest("button, a"))) return;
+        event.preventDefault();
+        if (isBall) suppressBallClick = false;
+        drag = { x: event.clientX, y: event.clientY, ballX, ballY, cardX, cardY, moved: false };
+        handle.setPointerCapture?.(event.pointerId);
+      });
+      window.addEventListener("pointermove", (event) => {
+        if (!drag) return;
+        const dx = event.clientX - drag.x;
+        const dy = event.clientY - drag.y;
+        if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+        drag.moved = true;
+        if (isBall) { ballX = drag.ballX + dx; ballY = drag.ballY + dy; }
+        cardX = drag.cardX + dx;
+        cardY = drag.cardY + dy;
+        place();
+      });
+      const finish = () => {
+        if (drag?.moved && isBall) suppressBallClick = true;
+        drag = null;
+      };
+      window.addEventListener("pointerup", finish);
+      window.addEventListener("pointercancel", finish);
+    };
+    draggable(ball, true);
+    draggable(header, false);
+    window.addEventListener("resize", place);
+    root.reposition = place;
+    place();
+    return root;
   }
 
-  function setStatus(message, kind = "working") {
-    const panel = statusPanel();
-    panel.textContent = message;
-    panel.style.background =
-      kind === "error" ? "#b42318" : kind === "done" ? "#267a42" : "#155eef";
+  function setStatus(message, kind = "working", summary) {
+    const root = statusPanel();
+    root.dataset.state = kind;
+    root.querySelector(".scut-lst-message").textContent = message;
+    root.querySelector(".scut-lst-state").textContent =
+      kind === "error" ? "已停止 · 请查看提示" : kind === "done" ? "答题完成 · 请核对后手动提交" : "正在处理 · 不会自动交卷";
+    const badge = root.querySelector(".scut-lst-badge");
+    badge.textContent = kind === "error" ? "!" : kind === "done" ? (summary?.skipped || "✓") : "…";
+    const counts = root.querySelector(".scut-lst-counts");
+    const progress = root.querySelector(".scut-lst-progress");
+    counts.hidden = progress.hidden = !summary;
+    if (summary) {
+      const values = [summary.total, summary.answered, summary.skipped];
+      counts.querySelectorAll("strong").forEach((element, index) => { element.textContent = values[index]; });
+      const percent = summary.total ? Math.min(100, Math.round((summary.answered + summary.skipped) / summary.total * 100)) : 0;
+      progress.setAttribute("aria-valuenow", String(percent));
+      progress.querySelector("span").style.width = `${percent}%`;
+    }
+    if (kind !== "done") {
+      root.querySelector(".scut-lst-actions").replaceChildren();
+      root.querySelector(".scut-lst-feedback").hidden = true;
+    }
+    root.reposition();
   }
 
   async function waitFor(check, timeout, interval = 250) {
@@ -394,7 +553,9 @@
           (result.skipped
             ? `本題跳过：${result.reason}`
             : `匹配度 ${Math.round(result.similarity * 100)}%`) +
-          `\n${result.stem.slice(0, 42)}`
+          `\n${result.stem.slice(0, 42)}`,
+        "working",
+        { total: nodes.length, answered, skipped: skippedCount }
       );
     }
 
@@ -499,20 +660,8 @@
   function panelButton(text, onClick) {
     const button = document.createElement("button");
     button.textContent = text;
-    Object.assign(button.style, {
-      // 面板本身 pointer-events:none 以免挡住页面，只让按钮可点。
-      pointerEvents: "auto",
-      marginTop: "8px",
-      width: "100%",
-      border: "0",
-      borderRadius: "7px",
-      padding: "8px 10px",
-      color: "#155eef",
-      background: "#fff",
-      font: "inherit",
-      fontWeight: "650",
-      cursor: "pointer",
-    });
+    button.type = "button";
+    button.style.pointerEvents = "auto";
     button.addEventListener("click", onClick);
     return button;
   }
@@ -601,7 +750,9 @@
   }
 
   function showReportButtons(report, summary) {
-    const panel = statusPanel();
+    const root = statusPanel();
+    const panel = root.querySelector(".scut-lst-actions");
+    panel.replaceChildren();
     if (summary.skipped > 0) {
       panel.appendChild(
         panelButton(`下载跳过题（${summary.skipped} 题）.txt`, () =>
@@ -629,15 +780,19 @@
         }
       })
     );
+    panel.lastElementChild.classList.add("scut-lst-primary");
+    if (summary.skipped > 0) panel.children[2].classList.add("scut-lst-wide");
+    const feedback = root.querySelector(".scut-lst-feedback");
+    feedback.replaceChildren();
+    feedback.hidden = false;
     const hint = document.createElement("p");
     hint.textContent = `请将 ZIP 作为附件发至 ${FEEDBACK_EMAIL}，由作者完善题库。问题和建议也欢迎邮件联系。`;
-    Object.assign(hint.style, { margin: "8px 0 0", fontSize: "12px", userSelect: "text", pointerEvents: "auto" });
-    panel.appendChild(hint);
+    feedback.appendChild(hint);
     const contact = document.createElement("a");
     contact.textContent = "邮件联系作者（请手动添加 ZIP 附件）";
     contact.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent("scut_LST 问题反馈与建议")}`;
-    Object.assign(contact.style, { display: "block", marginTop: "6px", color: "#155eef", pointerEvents: "auto" });
-    panel.appendChild(contact);
+    feedback.appendChild(contact);
+    root.reposition();
   }
 
   async function clearAutoRun() {
@@ -670,7 +825,8 @@
         `答题完成：共 ${result.total} 题。\n` +
           `已作答 ${result.answered} 题，跳过 ${result.skipped} 题。\n` +
           `跳过的题目保持空白；不会自动交卷，请核对后手动提交。`,
-        "done"
+        "done",
+        summary
       );
       showReportButtons(result.report, summary);
     } catch (error) {
