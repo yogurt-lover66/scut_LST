@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Node（测试用的 jsdom）
+node_modules/
+package-lock.json
+
+# 考试数据——绝对不要提交。
+# 里面是本人在平台上的作答记录、成绩和考试 ID。
+zida/
+
+# 系统杂项
+.DS_Store
+Thumbs.db
