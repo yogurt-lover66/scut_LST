@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "2.0.0";
+  const SCRIPT_VERSION = "2.2.0";
   if (globalThis.__safeTestAutoAnswerLoaded === SCRIPT_VERSION) return;
   globalThis.__safeTestAutoAnswerLoaded = SCRIPT_VERSION;
 
@@ -15,6 +15,7 @@
   const ANSWER_SAVE_DELAY = 600;
   const MAX_QUESTIONS = 300;
   const LETTERS = "ABCDEFGH";
+  const FEEDBACK_EMAIL = "2744481242@qq.com";
   const TYPE_NAMES = { 1: "单选题", 2: "多选题", 3: "判断题" };
   const QUESTION_SELECTOR = ".question-bottom-line";
   const WAIT_FOR_EXAM = 10 * 60 * 1000;
@@ -419,7 +420,7 @@
     return JSON.stringify(
       {
         generatedAt: new Date().toISOString(),
-        page: location.href,
+        site: location.origin,
         summary,
         questions: report,
       },
@@ -437,12 +438,10 @@
     const lines = [
       "# SafeTest 跳过题",
       "#",
-      "# 用法：在每题的 **答案：** 后填答案，然后跑",
-      "#     python3 tools/import_paper_answers.py",
-      "#     python3 tools/build_bank.py",
+      `# 如知道正确答案，可填写后发送到 ${FEEDBACK_EMAIL}，由作者完善题库。`,
       "#",
       "# 填法：单选 B。   多选 A,B,D。   判断 错。",
-      "# 没填答案的题会被导入器自动忽略。",
+      "# 不确定的答案请留空，也可直接将反馈包发给作者。",
       `# 本轮共 ${summary.total} 题，跳过 ${skipped.length} 题。`,
       "",
       "",
@@ -483,7 +482,7 @@
       `SafeTest 题目导出（共 ${summary.total} 题：${Object.entries(counts)
         .map(([kind, count]) => `${kind} ${count}`)
         .join("，")}）`,
-      `来源：${location.href}`,
+      `来源：${location.origin}`,
       "",
       "请逐题作答。单选题回复选项字母，判断题回复“正确”或“错误”，多选题回复多个字母。",
       "建议一行一题，格式：1.B  2.正确  3.AC",
@@ -518,28 +517,110 @@
     return button;
   }
 
+  // ZIP 使用无压缩存储，UTF-8 文件名和 CRC-32，可直接用系统解压工具打开。
+  function feedbackZip(report, summary) {
+    const instructions = [
+      "scut_LST 反馈说明",
+      "",
+      `请将此 ZIP 作为邮件附件发送到 ${FEEDBACK_EMAIL}。`,
+      "建议主题：scut_LST 问题反馈 / 题库补充 / 功能建议。",
+      "请描述遇到的问题、发生时间和复现步骤；如知道正确答案，也请注明。",
+      "有更多建议也欢迎直接通过邮箱联系作者。",
+      "",
+      "文件说明：题目.txt 包含题干和选项；答题明细.json 包含扩展本轮的匹配及选项结果。",
+      "存在跳过题时，跳过题.txt 预留答案填写位置，不确定的答案请留空。",
+      "扩展选中的答案不等于标准答案，请核对后说明需要修正的题目。",
+      "发送前请查看附件，勿添加姓名、学号、账号、密码等个人信息。",
+      "扩展仅生成本地文件，不会自动发送邮件；请在邮箱中手动添加 ZIP 附件。",
+    ].join("\n");
+    const files = [
+      ["scut_LST-题目.txt", textPayload(report, summary)],
+      ["scut_LST-答题明细.json", reportPayload(report, summary)],
+      ["反馈说明.txt", instructions],
+    ];
+    if (summary.skipped > 0) files.push(["scut_LST-跳过题.txt", skippedPayload(report, summary)]);
+
+    const encoder = new TextEncoder();
+    const localParts = [];
+    const directoryParts = [];
+    let offset = 0;
+    let directorySize = 0;
+    const now = new Date();
+    const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+    const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+
+    for (const [filename, text] of files) {
+      const name = encoder.encode(filename);
+      const data = encoder.encode(text);
+      let crc = 0xffffffff;
+      for (const byte of data) {
+        crc ^= byte;
+        for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+      }
+      crc = (crc ^ 0xffffffff) >>> 0;
+      const header = new Uint8Array(30 + name.length);
+      const view = new DataView(header.buffer);
+      view.setUint32(0, 0x04034b50, true);
+      view.setUint16(4, 20, true);
+      view.setUint16(6, 0x0800, true); // UTF-8
+      view.setUint16(10, dosTime, true);
+      view.setUint16(12, dosDate, true);
+      view.setUint32(14, crc, true);
+      view.setUint32(18, data.length, true);
+      view.setUint32(22, data.length, true);
+      view.setUint16(26, name.length, true);
+      header.set(name, 30);
+      localParts.push(header, data);
+
+      const directory = new Uint8Array(46 + name.length);
+      const central = new DataView(directory.buffer);
+      central.setUint32(0, 0x02014b50, true);
+      central.setUint16(4, 20, true);
+      central.setUint16(6, 20, true);
+      central.setUint16(8, 0x0800, true);
+      central.setUint16(12, dosTime, true);
+      central.setUint16(14, dosDate, true);
+      central.setUint32(16, crc, true);
+      central.setUint32(20, data.length, true);
+      central.setUint32(24, data.length, true);
+      central.setUint16(28, name.length, true);
+      central.setUint32(42, offset, true);
+      directory.set(name, 46);
+      directoryParts.push(directory);
+      directorySize += directory.length;
+      offset += header.length + data.length;
+    }
+    const end = new Uint8Array(22);
+    const endView = new DataView(end.buffer);
+    endView.setUint32(0, 0x06054b50, true);
+    endView.setUint16(8, files.length, true);
+    endView.setUint16(10, files.length, true);
+    endView.setUint32(12, directorySize, true);
+    endView.setUint32(16, offset, true);
+    return new Blob([...localParts, ...directoryParts, end], { type: "application/zip" });
+  }
+
   function showReportButtons(report, summary) {
     const panel = statusPanel();
-
-    // 有跳过才给这个按钮——它导出的东西可以直接拿去补题库。
-    if (summary.skipped > 0) {
-      panel.appendChild(
-        panelButton(`下载跳过题（${summary.skipped} 题，填答案后可直接入库）.txt`, () =>
-          download("safetest-跳过题.txt", skippedPayload(report, summary), "text/plain;charset=utf-8")
-        )
-      );
-    }
-
     panel.appendChild(
-      panelButton("下载题目（给大模型）.txt", () =>
-        download("safetest-题目.txt", textPayload(report, summary), "text/plain;charset=utf-8")
-      )
+      panelButton("下载反馈包 ZIP", () => {
+        try {
+          download("scut_LST-反馈包.zip", feedbackZip(report, summary), "application/zip");
+        } catch (error) {
+          console.error("SafeTest 反馈包下载失败：", error);
+          alert("反馈包生成失败，请重试或通过邮箱联系作者。");
+        }
+      })
     );
-    panel.appendChild(
-      panelButton("下载答题明细.json", () =>
-        download("safetest-答题明细.json", reportPayload(report, summary), "application/json")
-      )
-    );
+    const hint = document.createElement("p");
+    hint.textContent = `请将 ZIP 作为附件发至 ${FEEDBACK_EMAIL}，由作者完善题库。问题和建议也欢迎邮件联系。`;
+    Object.assign(hint.style, { margin: "8px 0 0", fontSize: "12px", userSelect: "text", pointerEvents: "auto" });
+    panel.appendChild(hint);
+    const contact = document.createElement("a");
+    contact.textContent = "邮件联系作者（请手动添加 ZIP 附件）";
+    contact.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent("scut_LST 问题反馈与建议")}`;
+    Object.assign(contact.style, { display: "block", marginTop: "6px", color: "#155eef", pointerEvents: "auto" });
+    panel.appendChild(contact);
   }
 
   async function clearAutoRun() {

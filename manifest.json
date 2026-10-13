@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "华工 SafeTest 自动答题",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "为华南理工大学实验室安全考试选择题库答案；永不自动交卷。",
   "permissions": ["activeTab", "storage", "scripting"],
   "host_permissions": [

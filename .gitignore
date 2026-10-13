@@ -13,3 +13,15 @@ zida/
 # 系统杂项
 .DS_Store
 Thumbs.db
+
+# 作者本地维护资料，不随发布版上传
+/tools/
+/docs/
+
+# 本地配置和凭据
+.aws/
+.codex/
+.agents/
+.env
+.env.*
+!.env.example
