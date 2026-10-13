@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "1.0.0-floating-ui-1";
+  const SCRIPT_VERSION = "1.0.0-floating-ui-2";
   if (globalThis.__safeTestAutoAnswerLoaded === SCRIPT_VERSION) return;
   globalThis.__safeTestAutoAnswerLoaded = SCRIPT_VERSION;
 
@@ -597,7 +597,7 @@
     const skipped = report.filter((item) => !item.answered);
 
     const lines = [
-      "# SafeTest 跳过题",
+      "# LST 跳过题",
       "#",
       `# 如知道正确答案，可填写后发送到 ${FEEDBACK_EMAIL}，由作者完善题库。`,
       "#",
@@ -640,7 +640,7 @@
       counts[kind] = (counts[kind] || 0) + 1;
     }
     const lines = [
-      `SafeTest 题目导出（共 ${summary.total} 题：${Object.entries(counts)
+      `LST 题目导出（共 ${summary.total} 题：${Object.entries(counts)
         .map(([kind, count]) => `${kind} ${count}`)
         .join("，")}）`,
       `来源：${location.origin}`,
@@ -669,25 +669,25 @@
   // ZIP 使用无压缩存储，UTF-8 文件名和 CRC-32，可直接用系统解压工具打开。
   function feedbackZip(report, summary) {
     const instructions = [
-      "scut_LST 反馈说明",
+      "LST 反馈说明",
       "",
       `请将此 ZIP 作为邮件附件发送到 ${FEEDBACK_EMAIL}。`,
       "建议主题：scut_LST 问题反馈 / 题库补充 / 功能建议。",
       "请描述遇到的问题、发生时间和复现步骤；如知道正确答案，也请注明。",
       "有更多建议也欢迎直接通过邮箱联系作者。",
       "",
-      "文件说明：题目.txt 包含题干和选项；答题明细.json 包含扩展本轮的匹配及选项结果。",
-      "存在跳过题时，跳过题.txt 预留答案填写位置，不确定的答案请留空。",
+      "文件说明：LST-题目.txt 包含题干和选项；LST-答题明细.json 包含扩展本轮的匹配及选项结果。",
+      "存在跳过题时，LST-跳过题.txt 预留答案填写位置，不确定的答案请留空。",
       "扩展选中的答案不等于标准答案，请核对后说明需要修正的题目。",
       "发送前请查看附件，勿添加姓名、学号、账号、密码等个人信息。",
       "扩展仅生成本地文件，不会自动发送邮件；请在邮箱中手动添加 ZIP 附件。",
     ].join("\n");
     const files = [
-      ["scut_LST-题目.txt", textPayload(report, summary)],
-      ["scut_LST-答题明细.json", reportPayload(report, summary)],
-      ["反馈说明.txt", instructions],
+      ["LST-题目.txt", textPayload(report, summary)],
+      ["LST-答题明细.json", reportPayload(report, summary)],
+      ["LST-反馈说明.txt", instructions],
     ];
-    if (summary.skipped > 0) files.push(["scut_LST-跳过题.txt", skippedPayload(report, summary)]);
+    if (summary.skipped > 0) files.push(["LST-跳过题.txt", skippedPayload(report, summary)]);
 
     const encoder = new TextEncoder();
     const localParts = [];
@@ -756,24 +756,24 @@
     if (summary.skipped > 0) {
       panel.appendChild(
         panelButton(`下载跳过题（${summary.skipped} 题）.txt`, () =>
-          download("safetest-跳过题.txt", skippedPayload(report, summary), "text/plain;charset=utf-8")
+          download("LST-跳过题.txt", skippedPayload(report, summary), "text/plain;charset=utf-8")
         )
       );
     }
     panel.appendChild(
       panelButton("下载题目（给大模型）.txt", () =>
-        download("safetest-题目.txt", textPayload(report, summary), "text/plain;charset=utf-8")
+        download("LST-题目.txt", textPayload(report, summary), "text/plain;charset=utf-8")
       )
     );
     panel.appendChild(
       panelButton("下载答题明细.json", () =>
-        download("safetest-答题明细.json", reportPayload(report, summary), "application/json")
+        download("LST-答题明细.json", reportPayload(report, summary), "application/json")
       )
     );
     panel.appendChild(
       panelButton("下载反馈包 ZIP", () => {
         try {
-          download("scut_LST-反馈包.zip", feedbackZip(report, summary), "application/zip");
+          download("LST-反馈包.zip", feedbackZip(report, summary), "application/zip");
         } catch (error) {
           console.error("SafeTest 反馈包下载失败：", error);
           alert("反馈包生成失败，请重试或通过邮箱联系作者。");
