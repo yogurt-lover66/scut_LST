@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "2.2.0";
+  const SCRIPT_VERSION = "1.0.0";
   if (globalThis.__safeTestAutoAnswerLoaded === SCRIPT_VERSION) return;
   globalThis.__safeTestAutoAnswerLoaded = SCRIPT_VERSION;
 
@@ -602,6 +602,23 @@
 
   function showReportButtons(report, summary) {
     const panel = statusPanel();
+    if (summary.skipped > 0) {
+      panel.appendChild(
+        panelButton(`下载跳过题（${summary.skipped} 题）.txt`, () =>
+          download("safetest-跳过题.txt", skippedPayload(report, summary), "text/plain;charset=utf-8")
+        )
+      );
+    }
+    panel.appendChild(
+      panelButton("下载题目（给大模型）.txt", () =>
+        download("safetest-题目.txt", textPayload(report, summary), "text/plain;charset=utf-8")
+      )
+    );
+    panel.appendChild(
+      panelButton("下载答题明细.json", () =>
+        download("safetest-答题明细.json", reportPayload(report, summary), "application/json")
+      )
+    );
     panel.appendChild(
       panelButton("下载反馈包 ZIP", () => {
         try {
